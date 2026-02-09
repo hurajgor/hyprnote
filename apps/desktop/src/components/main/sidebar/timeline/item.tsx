@@ -21,6 +21,7 @@ import { save } from "../../../../store/tinybase/store/save";
 import { getOrCreateSessionForEventId } from "../../../../store/tinybase/store/sessions";
 import { type TabInput, useTabs } from "../../../../store/zustand/tabs";
 import { useUndoDelete } from "../../../../store/zustand/undo-delete";
+import { getSessionEvent } from "../../../../utils/session-event";
 import {
   type EventTimelineItem,
   type SessionTimelineItem,
@@ -329,18 +330,10 @@ const SessionItem = memo(
     const isFinalizing = sessionMode === "finalizing";
     const showSpinner = !selected && (isFinalizing || isEnhancing);
 
-    const sessionEvent = useMemo(() => {
-      if (!item.data.event) return null;
-      try {
-        return JSON.parse(item.data.event) as {
-          tracking_id?: string;
-          calendar_id?: string;
-          started_at?: string;
-        };
-      } catch {
-        return null;
-      }
-    }, [item.data.event]);
+    const sessionEvent = useMemo(
+      () => getSessionEvent(item.data),
+      [item.data.event],
+    );
 
     const calendarId = sessionEvent?.calendar_id ?? null;
     const hasEvent = !!item.data.event;
