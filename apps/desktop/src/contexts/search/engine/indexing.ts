@@ -18,7 +18,7 @@ export function indexSessions(db: Index, store: MainStore): void {
     "user_id",
     "created_at",
     "folder_id",
-    "event_id",
+    "event",
     "title",
     "raw_md",
     "transcript",
