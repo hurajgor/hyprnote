@@ -9,7 +9,6 @@ import { useIgnoredEvents } from "../../../../hooks/tinybase";
 import { useNativeContextMenu } from "../../../../hooks/useNativeContextMenu";
 import * as main from "../../../../store/tinybase/store/main";
 import { useTabs } from "../../../../store/zustand/tabs";
-import { getSessionEventById } from "../../../../utils/session-event";
 import {
   buildTimelineBuckets,
   calculateIndicatorIndex,
