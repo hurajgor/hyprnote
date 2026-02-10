@@ -2,11 +2,11 @@ import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 
 import { Button } from "@hypr/ui/components/ui/button";
-import { cn, startOfDay } from "@hypr/utils";
+import { cn, format, safeParseDate, startOfDay, TZDate } from "@hypr/utils";
 
 import { useConfigValue } from "../../../../config/use-config";
-import { useNativeContextMenu } from "../../../../hooks/useNativeContextMenu";
 import { useIgnoredEvents } from "../../../../hooks/tinybase";
+import { useNativeContextMenu } from "../../../../hooks/useNativeContextMenu";
 import * as main from "../../../../store/tinybase/store/main";
 import { useTabs } from "../../../../store/zustand/tabs";
 import { getSessionEventById } from "../../../../utils/session-event";
@@ -31,7 +31,7 @@ export function TimelineView() {
   const timezone = useConfigValue("timezone") || undefined;
   const [showIgnored, setShowIgnored] = useState(false);
 
-  const { ignoredTrackingIds, ignoredSeriesIds } = useIgnoredEvents();
+  const { isIgnored } = useIgnoredEvents();
 
   const buckets = useMemo(() => {
     if (showIgnored) {
@@ -43,15 +43,22 @@ export function TimelineView() {
         ...bucket,
         items: bucket.items.filter((item) => {
           if (item.type !== "event") return true;
-          const tid = item.data.tracking_id_event;
-          if (tid && ignoredTrackingIds.has(tid)) return false;
-          const sid = item.data.recurrence_series_id;
-          if (sid && ignoredSeriesIds.has(sid)) return false;
-          return true;
+          const parsed = safeParseDate(item.data.started_at);
+          const day = parsed
+            ? format(
+                timezone ? new TZDate(parsed, timezone) : parsed,
+                "yyyy-MM-dd",
+              )
+            : undefined;
+          return !isIgnored(
+            item.data.tracking_id_event,
+            item.data.recurrence_series_id,
+            day,
+          );
         }),
       }))
       .filter((bucket) => bucket.items.length > 0);
-  }, [allBuckets, showIgnored, ignoredTrackingIds, ignoredSeriesIds]);
+  }, [allBuckets, showIgnored, isIgnored, timezone]);
 
   const hasToday = useMemo(
     () => buckets.some((bucket) => bucket.label === "Today"),
@@ -59,18 +66,10 @@ export function TimelineView() {
   );
 
   const currentTab = useTabs((state) => state.currentTab);
-  const store = main.UI.useStore(main.STORE_ID);
 
   const selectedSessionId = useMemo(() => {
     return currentTab?.type === "sessions" ? currentTab.id : undefined;
   }, [currentTab]);
-
-  const selectedEventTrackingId = useMemo(() => {
-    if (!selectedSessionId || !store) {
-      return undefined;
-    }
-    return getSessionEventById(store, selectedSessionId)?.tracking_id ?? undefined;
-  }, [selectedSessionId, store]);
 
   const {
     containerRef,
@@ -164,15 +163,12 @@ export function TimelineView() {
                   precision={bucket.precision}
                   registerIndicator={setCurrentTimeIndicatorRef}
                   selectedSessionId={selectedSessionId}
-                  selectedEventTrackingId={selectedEventTrackingId}
                   timezone={timezone}
                 />
               ) : (
                 bucket.items.map((item) => {
                   const selected =
-                    item.type === "session"
-                      ? item.id === selectedSessionId
-                      : item.data.tracking_id_event === selectedEventTrackingId;
+                    item.type === "session" && item.id === selectedSessionId;
                   return (
                     <TimelineItemComponent
                       key={`${item.type}-${item.id}`}
@@ -224,14 +220,12 @@ function TodayBucket({
   precision,
   registerIndicator,
   selectedSessionId,
-  selectedEventTrackingId,
   timezone,
 }: {
   items: TimelineItem[];
   precision: TimelinePrecision;
   registerIndicator: (node: HTMLDivElement | null) => void;
   selectedSessionId: string | undefined;
-  selectedEventTrackingId: string | undefined;
   timezone?: string;
 }) {
   const currentTimeMs = useCurrentTimeMs();
@@ -277,9 +271,7 @@ function TodayBucket({
       }
 
       const selected =
-        entry.item.type === "session"
-          ? entry.item.id === selectedSessionId
-          : entry.item.data.tracking_id_event === selectedEventTrackingId;
+        entry.item.type === "session" && entry.item.id === selectedSessionId;
 
       nodes.push(
         <TimelineItemComponent
@@ -308,7 +300,6 @@ function TodayBucket({
     precision,
     registerIndicator,
     selectedSessionId,
-    selectedEventTrackingId,
     timezone,
   ]);
 
